@@ -1,0 +1,22 @@
+{
+  "name": "e-docs-backend",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Auth, per-user file history and translation proxy API for E-Docs",
+  "engines": {
+    "node": "20.x"
+  },
+  "scripts": {
+    "dev": "node --watch src/index.js",
+    "build": "echo 'no build step needed — plain JS backend'",
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2",
+    "mongodb": "^7.6.0",
+    "multer": "^2.0.0"
+  }
+}
