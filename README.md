@@ -72,6 +72,11 @@ deploying this anywhere reachable by others — `backend/src/db.js` is where it'
 
 ## Getting started
 
+> **All frontend/backend URLs and ports live in one file: [`backend/urls.config.js`](backend/urls.config.js)**
+> (`FRONTEND_PORT`, `BACKEND_PORT`, `FRONTEND_URL`, `BACKEND_URL`, `API_BASE_URL`). The Vite dev
+> server, its `/api` proxy, the React app, the Express backend and the test scripts all read it.
+> On a deployment host, the env vars `VITE_API_BASE`, `FRONTEND_ORIGIN` and `PORT` override it.
+
 **Prerequisite:** a MongoDB server running and reachable (locally: install MongoDB
 Community Server and make sure its service is running — Windows installs it as a
 service named "MongoDB" by default. No database or collections need to be created

@@ -9,14 +9,15 @@ import historyRoutes from './routes/history.js'
 import adminRoutes from './routes/admin.js'
 import translateRoutes from './routes/translate.js'
 import convertRoutes from './routes/convert.js'
+import { BACKEND_PORT, FRONTEND_URL } from '../urls.config.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const PORT = process.env.PORT || 8787
+const PORT = process.env.PORT || BACKEND_PORT
 
 // Only requests whose browser-sent Origin header matches one of these are allowed to read
 // the response — everything else (curl, server-to-server, no Origin header at all) still
 // goes through untouched, since Origin is a browser-only concept.
-const allowedOrigins = (process.env.FRONTEND_ORIGIN || 'http://localhost:5173')
+const allowedOrigins = (process.env.FRONTEND_ORIGIN || FRONTEND_URL)
   .split(',')
   .map((o) => o.trim())
   .filter(Boolean)

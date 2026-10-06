@@ -1,13 +1,12 @@
 // Thin client for the E-Docs backend (backend/) — auth + per-user file history.
+import { API_BASE_URL } from '../../backend/urls.config.js'
+
 const TOKEN_KEY = 'edocs_token'
 
-// Empty by default: same-origin, relative "/api/..." calls (local dev via the Vite
-// proxy, or the combined single-Vercel-project deploy). Set VITE_API_BASE at build
-// time (e.g. "https://edocs-api.onrender.com") when the frontend and backend
-// are deployed to two different hosts/domains — this is the FRONTEND's own env var
-// (see .env.example at the project root), separate from backend/.env's FRONTEND_ORIGIN
-// (that one instead tells the *backend* which frontend URL to accept requests from).
-export const API_BASE = (import.meta.env.VITE_API_BASE ?? '').replace(/\/$/, '')
+// Backend URL the browser calls — set once in backend/urls.config.js (API_BASE_URL;
+// '' = same domain via relative "/api/..." calls). The VITE_API_BASE env var, set on the
+// frontend host at build time (e.g. Vercel), overrides it.
+export const API_BASE = (import.meta.env.VITE_API_BASE ?? API_BASE_URL).replace(/\/$/, '')
 
 export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY)

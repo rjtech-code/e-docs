@@ -20,7 +20,8 @@ if (!isManagedHost) {
     const secret = crypto.randomBytes(48).toString('hex')
     fs.writeFileSync(
       envPath,
-      `PORT=8787\nJWT_SECRET=${secret}\nMONGODB_URI=mongodb://127.0.0.1:27017/sikshapaper\nFRONTEND_ORIGIN=http://localhost:5173\n`,
+      // URLs/ports are NOT written here — they come from backend/urls.config.js.
+      `JWT_SECRET=${secret}\nMONGODB_URI=mongodb://127.0.0.1:27017/sikshapaper\n`,
     )
     console.log('Created backend/.env with a generated JWT_SECRET and a default local MONGODB_URI (edit it any time).')
   }

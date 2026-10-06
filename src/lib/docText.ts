@@ -1,6 +1,6 @@
 import { extractPageText, loadPdfJs, readFileAsArrayBuffer } from './pdfCore'
 
-export const TEXT_ACCEPT = '.pdf,.docx,.txt,.md,.csv,application/pdf,text/plain'
+export const TEXT_ACCEPT = '.pdf,.docx,.pptx,.txt,.md,.csv,application/pdf,text/plain'
 
 /** Pulls plain text out of a PDF, DOCX or text file so it can be translated. */
 export async function extractDocumentText(file: File, onProgress?: (percent: number) => void): Promise<string> {

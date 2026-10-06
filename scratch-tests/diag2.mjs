@@ -1,6 +1,7 @@
 import { chromium } from 'playwright'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { FRONTEND_URL } from '../backend/urls.config.js'
 
 const dir = path.dirname(fileURLToPath(import.meta.url))
 const log = (...a) => console.log(new Date().toISOString(), ...a)
@@ -13,7 +14,7 @@ page.on('pageerror', (e) => log('  [pageerror]', e.message))
 page.on('requestfailed', (r) => log('  [requestfailed]', r.url(), r.failure()?.errorText))
 
 log('goto merge-pdf')
-await page.goto('http://localhost:5173/merge-pdf', { waitUntil: 'networkidle', timeout: 20000 })
+await page.goto(`${FRONTEND_URL}/merge-pdf`, { waitUntil: 'networkidle', timeout: 20000 })
 log('goto done')
 
 const pdfA = path.join(dir, 'sample-a.pdf')

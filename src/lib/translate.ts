@@ -6,7 +6,7 @@
 //   3. MyMemory free API (500-byte requests, daily quota) — last resort
 // Long text is chunked to each engine's limit while preserving line breaks.
 
-const API_BASE = ((import.meta as { env?: Record<string, string> }).env?.VITE_API_BASE ?? '').replace(/\/$/, '')
+import { API_BASE } from './api'
 
 export interface Language {
   code: string

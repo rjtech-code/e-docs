@@ -35,7 +35,8 @@ RUN npm ci --omit=dev
 COPY backend/ ./
 COPY --from=web /app/dist /app/dist
 
-ENV NODE_ENV=production \
-    PORT=8787
+# The port comes from backend/urls.config.js (BACKEND_PORT) unless the host sets PORT.
+# EXPOSE is only documentation for Docker — keep it equal to BACKEND_PORT.
+ENV NODE_ENV=production
 EXPOSE 8787
 CMD ["node", "src/index.js"]

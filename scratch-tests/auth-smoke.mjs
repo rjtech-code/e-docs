@@ -2,12 +2,13 @@ import { chromium } from 'playwright'
 import path from 'node:path'
 import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import { FRONTEND_URL } from '../backend/urls.config.js'
 
 const dir = path.dirname(fileURLToPath(import.meta.url))
 const out = path.join(dir, 'downloads')
 fs.mkdirSync(out, { recursive: true })
 
-const BASE = 'http://localhost:5173'
+const BASE = FRONTEND_URL
 const results = []
 const uniqueEmail = `test-${Date.now()}@example.com`
 const password = 'password123'
