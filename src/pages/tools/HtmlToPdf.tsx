@@ -100,7 +100,7 @@ export default function HtmlToPdf() {
       if (!isSaveShortcut) return
 
       const target = event.target
-      if (target instanceof HTMLElement && target.closest('input, textarea, select, [contenteditable="true"], [role="textbox"]')) return
+      if (target instanceof HTMLElement && target.closest('textarea, [contenteditable="true"], [role="textbox"]')) return
 
       event.preventDefault()
       void convertRef.current(true)
