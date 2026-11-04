@@ -30,7 +30,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app/backend
 COPY backend/package*.json ./
 RUN npm ci --omit=dev
-COPY backend/ ./ 
+COPY backend/ ./
 # The root project already installs Playwright as a build dependency. Copy its runtime
 # packages into the final image so the backend can launch the system Chromium binary.
 COPY --from=web /app/node_modules/playwright /app/node_modules/playwright
