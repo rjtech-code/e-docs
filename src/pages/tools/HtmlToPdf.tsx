@@ -20,9 +20,9 @@ function getPdfErrorMessage(message: string) {
     const data = JSON.parse(message)
     if (typeof data?.error === 'string') return data.error
   } catch {
-    // Keep the friendly fallback for non-JSON responses (e.g. hosting errors).
+    // Non-JSON responses often mean the frontend host returned an HTML error page.
   }
-  return message
+  return 'Could not convert webpage. Check that the backend is running with Chromium support.'
 }
 
 export default function HtmlToPdf() {
