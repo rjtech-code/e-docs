@@ -25,6 +25,7 @@ const allowedOrigins = [...new Set([
   ...(process.env.FRONTEND_ORIGIN || '').split(','),
   'https://e-docs.adligare.tech',
   'https://www.e-docs.adligare.tech',
+  'https://e-docs-3a32.onrender.com',
 ].map((o) => o.trim()).filter(Boolean))]
 
 const app = express()
