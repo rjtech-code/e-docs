@@ -48,8 +48,8 @@ let dbReady = false
 app.get('/api/health', (_req, res) => res.json({ ok: true, dbReady }))
 // These tools don't need MongoDB, so they remain available before the DB-ready gate.
 app.use('/api/translate', translateRoutes())
-app.use('/api/convert', convertRoutes())
 app.use('/api/convert', webpageToPdfRoutes())
+app.use('/api/convert', convertRoutes())
 app.use('/api', (_req, res, next) => {
   if (!dbReady) return res.status(503).json({ error: 'Still connecting to the database — try again in a moment' })
   next()
