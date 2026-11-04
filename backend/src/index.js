@@ -9,6 +9,7 @@ import historyRoutes from './routes/history.js'
 import adminRoutes from './routes/admin.js'
 import translateRoutes from './routes/translate.js'
 import convertRoutes from './routes/convert.js'
+import webpageToPdfRoutes from './routes/webpageToPdf.js'
 import { BACKEND_PORT, FRONTEND_URL } from '../urls.config.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -45,10 +46,10 @@ app.use(express.json({ limit: '2mb' }))
 // /health is gated behind this flag until connectDB() below resolves.
 let dbReady = false
 app.get('/api/health', (_req, res) => res.json({ ok: true, dbReady }))
-// Translation proxy needs no database, so it is mounted before the db-ready gate below.
+// These tools don't need MongoDB, so they remain available before the DB-ready gate.
 app.use('/api/translate', translateRoutes())
-// Document conversion (LibreOffice / Python) also needs no database.
 app.use('/api/convert', convertRoutes())
+app.use('/api/convert', webpageToPdfRoutes())
 app.use('/api', (_req, res, next) => {
   if (!dbReady) return res.status(503).json({ error: 'Still connecting to the database — try again in a moment' })
   next()
