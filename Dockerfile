@@ -1,8 +1,7 @@
 # One image that runs the whole app (API + built frontend) WITH the conversion engines
-# (LibreOffice + Python libs) that high-fidelity Word/PowerPoint/Excel <-> PDF needs.
+# (LibreOffice + Python) and Chromium for high-fidelity webpage-to-PDF rendering.
 # Deploy this on a Docker-capable host (Render, Railway, Fly.io, a VPS...). Vercel's
-# serverless functions cannot run LibreOffice — there the app falls back to its in-browser
-# converters automatically.
+# serverless functions cannot run system Chromium or LibreOffice reliably.
 
 # ---- 1) build the frontend ----
 FROM node:20-bookworm-slim AS web
@@ -16,11 +15,10 @@ RUN npm run build
 FROM node:20-bookworm-slim
 ENV DEBIAN_FRONTEND=noninteractive
 
-# LibreOffice (only the modules we need) + Python for pdf2docx / pdfplumber.
-# Fonts matter for "same-to-same" output: Carlito/Caladea are metric-compatible with
-# Calibri/Cambria, Liberation with Arial/Times/Courier, Noto covers Hindi (Devanagari)
-# and other Indian scripts, plus emoji.
+# Chromium + LibreOffice + Python conversion tools. Fonts matter for layout fidelity;
+# Noto covers Hindi (Devanagari) and other Indian scripts, plus emoji.
 RUN apt-get update && apt-get install -y --no-install-recommends \
+      chromium \
       libreoffice-writer libreoffice-calc libreoffice-impress libreoffice-draw \
       python3 python3-pip \
       fonts-liberation fonts-dejavu-core fonts-crosextra-carlito fonts-crosextra-caladea \
@@ -33,10 +31,13 @@ WORKDIR /app/backend
 COPY backend/package*.json ./
 RUN npm ci --omit=dev
 COPY backend/ ./
+# The root project already installs Playwright as a build dependency. Copy its runtime
+# packages into the final image so the backend can launch the system Chromium binary.
+COPY --from=web /app/node_modules/playwright /app/node_modules/playwright
+COPY --from=web /app/node_modules/playwright-core /app/node_modules/playwright-core
 COPY --from=web /app/dist /app/dist
 
-# The port comes from backend/urls.config.js (BACKEND_PORT) unless the host sets PORT.
-# EXPOSE is only documentation for Docker — keep it equal to BACKEND_PORT.
 ENV NODE_ENV=production
+ENV CHROMIUM_PATH=/usr/bin/chromium
 EXPOSE 8787
 CMD ["node", "src/index.js"]
