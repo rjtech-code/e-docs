@@ -18,16 +18,21 @@ const PORT = process.env.PORT || BACKEND_PORT
 // Only requests whose browser-sent Origin header matches one of these are allowed to read
 // the response — everything else (curl, server-to-server, no Origin header at all) still
 // goes through untouched, since Origin is a browser-only concept.
-const allowedOrigins = (process.env.FRONTEND_ORIGIN || FRONTEND_URL)
-  .split(',')
-  .map((o) => o.trim())
-  .filter(Boolean)
+// Keep the deployed custom frontend domains allowed even if Render has an
+// outdated FRONTEND_ORIGIN value. FRONTEND_ORIGIN can still add staging/local origins.
+const allowedOrigins = [...new Set([
+  ...FRONTEND_URL.split(','),
+  ...(process.env.FRONTEND_ORIGIN || '').split(','),
+  'https://e-docs.adligare.tech',
+  'https://www.e-docs.adligare.tech',
+].map((o) => o.trim()).filter(Boolean))]
 
 const app = express()
 app.use((req, res, next) => {
   const origin = req.headers.origin
   if (origin) {
     if (!allowedOrigins.includes(origin)) {
+      console.warn(`[CORS] Blocked origin: ${origin}`)
       return res.status(403).json({ error: 'Origin not allowed' })
     }
     res.setHeader('Access-Control-Allow-Origin', origin)
