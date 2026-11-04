@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { Code2, Monitor, Smartphone } from 'lucide-react'
 import { ToolShell, PrimaryButton, SecondaryButton, StatusBanner, DownloadCard } from '../../components/ToolShell'
 import { downloadBlob } from '../../lib/pdfCore'
@@ -30,14 +30,13 @@ export default function HtmlToPdf() {
   const [html, setHtml] = useState(sample)
   const [url, setUrl] = useState('')
   const [viewport, setViewport] = useState<Viewport>('desktop')
-  const [savePdfOnShortcut, setSavePdfOnShortcut] = useState(false)
   const conversionInProgress = useRef(false)
   const [status, setStatus] = useState<Status>('idle')
   const [error, setError] = useState('')
   const [result, setResult] = useState<{ blob: Blob; name: string } | null>(null)
   const history = useToolHistory('html-to-pdf', 'HTML to PDF')
 
-  const convert = async (downloadImmediately = false) => {
+  const convert = async () => {
     if (conversionInProgress.current) return
     conversionInProgress.current = true
     setStatus('processing')
@@ -81,7 +80,6 @@ export default function HtmlToPdf() {
 
       setResult({ blob, name: filename })
       history.saveResult(blob, filename)
-      if (downloadImmediately) downloadBlob(blob, filename)
       setStatus('done')
     } catch (e) {
       console.error('[HTML to PDF]', e)
@@ -92,26 +90,6 @@ export default function HtmlToPdf() {
     }
   }
 
-  useEffect(() => {
-    if (mode !== 'url' || !savePdfOnShortcut) return
-
-    const handleSaveShortcut = (event: KeyboardEvent) => {
-      const isSaveShortcut = (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's'
-      if (!isSaveShortcut) return
-
-      const target = event.target
-      if (target instanceof HTMLElement && target.closest('textarea, [contenteditable="true"], [role="textbox"]')) return
-
-      event.preventDefault()
-      void convertRef.current(true)
-    }
-
-    window.addEventListener('keydown', handleSaveShortcut)
-    return () => window.removeEventListener('keydown', handleSaveShortcut)
-  }, [mode, savePdfOnShortcut])
-
-  const convertRef = useRef<(downloadImmediately?: boolean) => Promise<void>>(async () => {})
-  convertRef.current = convert
 
   return (
     <ToolShell icon={Code2} title="HTML to PDF" description="Convert HTML markup or capture a complete live webpage as a multi-page PDF.">
@@ -146,23 +124,6 @@ export default function HtmlToPdf() {
               className="w-full rounded-xl border border-border px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/50"
             />
           </label>
-
-          <div className="flex items-center justify-between gap-4 rounded-2xl border border-border bg-surface p-4">
-            <div className="min-w-0">
-              <div className="text-sm font-semibold">Ctrl + S → Save as PDF</div>
-              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">When enabled, pressing Ctrl + S (or Cmd + S on Mac) downloads this URL as a PDF.</p>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={savePdfOnShortcut}
-              aria-label="Enable Ctrl+S to save as PDF"
-              onClick={() => setSavePdfOnShortcut((enabled) => !enabled)}
-              className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 ${savePdfOnShortcut ? 'bg-primary' : 'bg-border'}`}
-            >
-              <span className={`inline-block size-5 rounded-full bg-white shadow transition-transform ${savePdfOnShortcut ? 'translate-x-6' : 'translate-x-1'}`} />
-            </button>
-          </div>
 
           <fieldset>
             <legend className="mb-2 text-sm font-semibold">Choose page layout</legend>
