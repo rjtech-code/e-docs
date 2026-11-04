@@ -5,7 +5,7 @@ import { isIP } from 'node:net'
 const MAX_URL_LENGTH = 2048
 const NAVIGATION_TIMEOUT_MS = Number(process.env.WEBPDF_TIMEOUT_MS || 45_000)
 const MAX_PAGE_HEIGHT = 100_000
-const MAX_SCROLL_STEPS = 80
+const MAX_SCROLL_STEPS = 160
 const MAX_CONCURRENT = Number(process.env.WEBPDF_CONCURRENCY || 2)
 let activeJobs = 0
 
@@ -70,22 +70,26 @@ async function assertPublicHttpUrl(raw) {
 }
 
 async function scrollToLoadContent(page) {
+  let scrollY = 0
   let previousHeight = 0
-  let stablePasses = 0
+  let stableAtBottom = 0
   for (let i = 0; i < MAX_SCROLL_STEPS; i++) {
-    const height = await page.evaluate(() => Math.max(
-      document.documentElement.scrollHeight,
-      document.body?.scrollHeight || 0,
-    ))
+    const { height, viewportHeight } = await page.evaluate(() => ({
+      height: Math.max(document.documentElement.scrollHeight, document.body?.scrollHeight || 0),
+      viewportHeight: window.innerHeight || 800,
+    }))
     if (height > MAX_PAGE_HEIGHT) {
       throw new WebPdfError(413, 'This webpage is too long to safely convert to a PDF')
     }
-    if (height <= previousHeight) stablePasses++
-    else stablePasses = 0
-    if (stablePasses >= 3) break
-    previousHeight = height
-    await page.evaluate((y) => window.scrollTo(0, y), Math.min((i + 1) * 900, Math.max(0, height - 1)))
+    const maxScroll = Math.max(0, height - viewportHeight)
+    if (scrollY >= maxScroll - 2 && height === previousHeight) stableAtBottom++
+    else stableAtBottom = 0
+    if (stableAtBottom >= 3) break
+
+    scrollY = Math.min(scrollY + Math.max(600, Math.floor(viewportHeight * 0.8)), maxScroll)
+    await page.evaluate((y) => window.scrollTo(0, y), scrollY)
     await page.waitForTimeout(120)
+    previousHeight = height
   }
   await page.evaluate(() => window.scrollTo(0, 0))
   await page.waitForTimeout(250)
