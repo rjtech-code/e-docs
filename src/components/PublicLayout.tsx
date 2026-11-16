@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Menu, ArrowRight, LogIn, LayoutGrid, Home, Sparkles, ListChecks, Info, LayoutDashboard } from 'lucide-react'
+import { Menu, ArrowRight, LogIn, LayoutGrid, Home, Sparkles, ListChecks, Info, LayoutDashboard, FileSearch } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { tools, categoryLabels, type ToolCategory } from '../data/tools'
 import { LogoMark, Wordmark, AdligareCredit } from './Logo'
@@ -9,6 +9,7 @@ import Drawer from './Drawer'
 const LINKS = [
   { href: '#top', label: 'Home', icon: Home },
   { href: '#tools', label: 'Tools', icon: LayoutGrid },
+  { href: '/pdf-smart-search', label: 'Smart PDF Search', icon: FileSearch },
   { href: '#features', label: 'Features', icon: Sparkles },
   { href: '#how-it-works', label: 'How It Works', icon: ListChecks },
   { href: '#about', label: 'About', icon: Info },
