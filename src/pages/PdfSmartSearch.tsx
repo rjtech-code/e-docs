@@ -45,7 +45,8 @@ function PdfPage({ doc, pageNumber, query, matches, zoom, onPageReady }: {
         const page: PDFPageProxy = await doc.getPage(pageNumber)
         if (cancelled) return
         const base = page.getViewport({ scale: 1 })
-        const available = Math.max(280, Math.min(1100, window.innerWidth - 48))
+        const hostWidth = canvasRef.current?.parentElement?.parentElement?.clientWidth || window.innerWidth - 48
+        const available = Math.max(240, Math.min(1100, hostWidth - 24))
         const scale = Math.max(0.35, Math.min(2.2, (available / base.width) * zoom))
         const viewport = page.getViewport({ scale })
         const canvas = canvasRef.current
@@ -57,10 +58,9 @@ function PdfPage({ doc, pageNumber, query, matches, zoom, onPageReady }: {
         canvas.height = Math.floor(viewport.height * ratio)
         canvas.style.width = `${viewport.width}px`
         canvas.style.height = `${viewport.height}px`
-        context.setTransform(ratio, 0, 0, ratio, 0, 0)
         setPageHeight(viewport.height)
         onPageReady?.(pageNumber, viewport.height)
-        renderTask = page.render({ canvasContext: context, viewport, canvas })
+        renderTask = page.render({ canvasContext: context, viewport, transform: ratio !== 1 ? [ratio, 0, 0, ratio, 0, 0] : undefined, canvas })
         await (renderTask as any).promise
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : 'Could not render this page')
