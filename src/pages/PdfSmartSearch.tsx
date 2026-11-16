@@ -256,7 +256,7 @@ export default function PdfSmartSearch() {
       </div>
 
       {!doc && (
-        <label className="flex min-h-[360px] cursor-pointer flex-col items-center justify-center rounded-3xl border-2 border-dashed border-blue-200 bg-white px-6 py-12 text-center transition-colors hover:border-blue-400 hover:bg-blue-50/40">
+        <label onDragOver={event => event.preventDefault()} onDrop={event => { event.preventDefault(); void openFile(event.dataTransfer.files[0]) }} className="flex min-h-[360px] cursor-pointer flex-col items-center justify-center rounded-3xl border-2 border-dashed border-blue-200 bg-white px-6 py-12 text-center transition-colors hover:border-blue-400 hover:bg-blue-50/40">
           <span className="grid h-16 w-16 place-items-center rounded-2xl bg-blue-50 text-blue-600"><FileSearch size={30} /></span>
           <span className="mt-5 text-xl font-bold text-slate-900">Drop your PDF here</span>
           <span className="mt-2 max-w-md text-sm text-slate-500">Open and search large documents directly in your browser. Your PDF stays on your device.</span>
