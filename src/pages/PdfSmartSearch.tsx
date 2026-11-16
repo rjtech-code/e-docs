@@ -161,8 +161,10 @@ export default function PdfSmartSearch() {
         if (at < 0) break
         const first = map[at], last = map[at + needle.length - 1]
         if (first && last) {
-          const start = page.items[first.item]?.start ?? 0
-          const end = page.items[last.item]?.end ?? start
+          // Keep the exact character offsets, not the whole PDF text item.
+          // This lets the page overlay highlight only the searched word/phrase.
+          const start = (page.items[first.item]?.start ?? 0) + first.char
+          const end = (page.items[last.item]?.start ?? 0) + last.char + 1
           found.push({ docId: document.id, docName: document.name, page: index + 1, start, end, text: page.text.slice(start, end).trim() })
         }
         from = at + Math.max(1, needle.length)
