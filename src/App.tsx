@@ -8,6 +8,7 @@ import NotFound from './pages/NotFound'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
 import AppHome from './pages/AppHome'
+import PdfSmartSearch from './pages/PdfSmartSearch'
 import History from './pages/History'
 import SettingsPage from './pages/Settings'
 import AdminPanel from './pages/AdminPanel'
@@ -57,6 +58,7 @@ export default function App() {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/all-tools" element={<AllTools />} />
+            <Route path="/pdf-smart-search" element={<PdfSmartSearch />} />
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
             <Route path="/home" element={<AppHome />} />

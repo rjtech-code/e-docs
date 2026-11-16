@@ -1,0 +1,314 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { ChangeEvent, CSSProperties } from 'react'
+import { Link } from 'react-router-dom'
+import {
+  ArrowLeft, ChevronLeft, ChevronRight, FileSearch, FileUp, Minus, Plus,
+  Search, X, LoaderCircle, AlertCircle,
+} from 'lucide-react'
+import * as pdfjs from 'pdfjs-dist'
+import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist'
+
+pdfjs.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString()
+
+type Match = { page: number; start: number; end: number; text: string }
+type PageText = { text: string; items: Array<{ str: string; start: number; end: number }> }
+
+const normalise = (value: string) => value.toLocaleLowerCase().replace(/[\s\u00a0]+/g, '')
+
+function extractNormalised(page: PageText) {
+  let normal = ''
+  const map: Array<{ item: number; char: number }> = []
+  page.items.forEach((item, itemIndex) => {
+    for (let i = 0; i < item.str.length; i++) {
+      const char = item.str[i]
+      if (/\s|\u00a0/.test(char)) continue
+      normal += char.toLocaleLowerCase()
+      map.push({ item: itemIndex, char: i })
+    }
+  })
+  return { normal, map }
+}
+
+function PdfPage({ doc, pageNumber, query, matches, zoom, onPageReady }: {
+  doc: PDFDocumentProxy; pageNumber: number; query: string; matches: Match[]; zoom: number
+  onPageReady?: (page: number, height: number) => void
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const [error, setError] = useState('')
+  const [pageHeight, setPageHeight] = useState(700)
+
+  useEffect(() => {
+    let cancelled = false
+    let renderTask: { cancel: () => void } | undefined
+    const render = async () => {
+      try {
+        const page: PDFPageProxy = await doc.getPage(pageNumber)
+        if (cancelled) return
+        const base = page.getViewport({ scale: 1 })
+        const hostWidth = canvasRef.current?.parentElement?.parentElement?.clientWidth || window.innerWidth - 48
+        const available = Math.max(240, Math.min(1100, hostWidth - 24))
+        const scale = Math.max(0.35, Math.min(2.2, (available / base.width) * zoom))
+        const viewport = page.getViewport({ scale })
+        const canvas = canvasRef.current
+        if (!canvas) return
+        const context = canvas.getContext('2d')
+        if (!context) return
+        const ratio = Math.min(window.devicePixelRatio || 1, 2)
+        canvas.width = Math.floor(viewport.width * ratio)
+        canvas.height = Math.floor(viewport.height * ratio)
+        canvas.style.width = `${viewport.width}px`
+        canvas.style.height = `${viewport.height}px`
+        setPageHeight(viewport.height)
+        onPageReady?.(pageNumber, viewport.height)
+        renderTask = page.render({ canvasContext: context, viewport, transform: ratio !== 1 ? [ratio, 0, 0, ratio, 0, 0] : undefined, canvas })
+        await (renderTask as any).promise
+      } catch (e) {
+        if (!cancelled) setError(e instanceof Error ? e.message : 'Could not render this page')
+      }
+    }
+    void render()
+    return () => { cancelled = true; renderTask?.cancel() }
+  }, [doc, pageNumber, zoom, onPageReady])
+
+  return (
+    <div className="relative mx-auto w-fit overflow-hidden rounded-lg bg-white shadow-lg ring-1 ring-slate-200">
+      <canvas ref={canvasRef} aria-label={`PDF page ${pageNumber}`} />
+      {error && <div className="p-6 text-sm text-red-600">{error}</div>}
+      <span className="absolute bottom-2 right-2 rounded bg-slate-900/75 px-2 py-1 text-[10px] text-white">Page {pageNumber}</span>
+      <span className="sr-only" style={{ height: pageHeight }}>Page {pageNumber}</span>
+      {query && matches.length > 0 && (
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-blue-500/0" aria-hidden="true" />
+      )}
+    </div>
+  )
+}
+
+export default function PdfSmartSearch() {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [doc, setDoc] = useState<PDFDocumentProxy | null>(null)
+  const [fileName, setFileName] = useState('')
+  const [pages, setPages] = useState<PageText[]>([])
+  const [query, setQuery] = useState('')
+  const [active, setActive] = useState(0)
+  const [layout, setLayout] = useState<'1x1' | '1x2' | '2x2'>('1x1')
+  const [zoom, setZoom] = useState(1)
+  const [loading, setLoading] = useState(false)
+  const [progress, setProgress] = useState('')
+  const [error, setError] = useState('')
+  const [showResults, setShowResults] = useState(true)
+  const [currentPage, setCurrentPage] = useState(1)
+
+  const openFile = async (file?: File) => {
+    if (!file) return
+    if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+      setError('Please choose a valid PDF file.')
+      return
+    }
+    setError('')
+    setLoading(true)
+    setProgress('Opening PDF…')
+    setQuery('')
+    setPages([])
+    setActive(0)
+    try {
+      const bytes = await file.arrayBuffer()
+      const task = pdfjs.getDocument({ data: bytes })
+      const loaded = await task.promise
+      setDoc(loaded)
+      setFileName(file.name)
+      const extracted: PageText[] = []
+      for (let pageNo = 1; pageNo <= loaded.numPages; pageNo++) {
+        setProgress(`Reading text · page ${pageNo} of ${loaded.numPages}`)
+        const page = await loaded.getPage(pageNo)
+        const content = await page.getTextContent()
+        const items = content.items
+          .filter((item: any) => typeof item.str === 'string')
+          .map((item: any) => ({ str: item.str, start: 0, end: 0 }))
+        let text = ''
+        items.forEach((item) => {
+          item.start = text.length
+          text += item.str + ' '
+          item.end = text.length
+        })
+        extracted.push({ text, items })
+      }
+      setPages(extracted)
+      setCurrentPage(1)
+      setProgress('')
+    } catch (e) {
+      setDoc(null)
+      setError(e instanceof Error ? e.message : 'Unable to open this PDF. It may be damaged or password protected.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const matches = useMemo<Match[]>(() => {
+    const needle = normalise(query)
+    if (!needle) return []
+    const found: Match[] = []
+    pages.forEach((page, index) => {
+      const { normal, map } = extractNormalised(page)
+      let from = 0
+      while (from <= normal.length - needle.length) {
+        const at = normal.indexOf(needle, from)
+        if (at < 0) break
+        const first = map[at]
+        const last = map[at + needle.length - 1]
+        if (first && last) {
+          const start = page.items[first.item]?.start ?? 0
+          const end = page.items[last.item]?.end ?? start
+          found.push({ page: index + 1, start, end, text: page.text.slice(start, end).trim() })
+        }
+        from = at + Math.max(1, needle.length)
+      }
+    })
+    return found
+  }, [pages, query])
+
+  useEffect(() => { setActive(0) }, [query])
+
+  const goToMatch = useCallback((index: number) => {
+    if (!matches.length) return
+    const next = (index + matches.length) % matches.length
+    setActive(next)
+    setCurrentPage(matches[next].page)
+    document.getElementById(`pdf-page-${matches[next].page}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }, [matches])
+
+  const previous = () => goToMatch(active - 1)
+  const next = () => goToMatch(active + 1)
+  const visiblePages = useMemo(() => {
+    if (!doc) return []
+    const count = layout === '1x1' ? 1 : layout === '1x2' ? 2 : 4
+    const start = layout === '1x1' ? currentPage : Math.max(1, Math.floor((currentPage - 1) / count) * count + 1)
+    return Array.from({ length: Math.min(count, doc.numPages - start + 1) }, (_, i) => start + i)
+  }, [doc, currentPage, layout])
+
+  const onFileInput = (event: ChangeEvent<HTMLInputElement>) => {
+    void openFile(event.target.files?.[0])
+    event.target.value = ''
+  }
+
+  const resultPanel = (
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="border-b border-slate-200 p-4">
+        <div className="flex items-center gap-2">
+          <div className="grid h-9 w-9 place-items-center rounded-xl bg-blue-50 text-blue-600"><Search size={18} /></div>
+          <div className="min-w-0 flex-1">
+            <h2 className="font-semibold text-slate-900">Find in document</h2>
+            <p className="truncate text-xs text-slate-500">{fileName || 'Search every page of your PDF'}</p>
+          </div>
+          <button onClick={() => setShowResults(false)} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100" aria-label="Hide search panel"><X size={17} /></button>
+        </div>
+        <div className="mt-4 flex gap-2">
+          <div className="relative min-w-0 flex-1">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input ref={inputRef} value={query} onChange={e => setQuery(e.target.value)} placeholder="Search a name or any text…" className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
+          </div>
+          {query && <button onClick={() => setQuery('')} className="rounded-xl border border-slate-200 px-3 text-slate-500 hover:bg-slate-50" aria-label="Clear search"><X size={17} /></button>}
+        </div>
+        <div className="mt-3 flex items-center justify-between gap-2">
+          <span className="text-xs text-slate-500">{query ? `${matches.length} match${matches.length === 1 ? '' : 'es'} found` : 'Case and spaces are ignored'}</span>
+          <div className="flex items-center gap-1">
+            <button disabled={!matches.length} onClick={previous} className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-50 disabled:opacity-35" aria-label="Previous match"><ChevronLeft size={17} /></button>
+            <span className="min-w-12 text-center text-xs font-semibold tabular-nums text-slate-700">{matches.length ? `${active + 1}/${matches.length}` : '0/0'}</span>
+            <button disabled={!matches.length} onClick={next} className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-50 disabled:opacity-35" aria-label="Next match"><ChevronRight size={17} /></button>
+          </div>
+        </div>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto p-3">
+        {!query ? (
+          <div className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500">Type a name or phrase. For example, <strong>mohitdarji</strong> also matches “Mohit Darji”.</div>
+        ) : matches.length ? (
+          <ol className="space-y-2">
+            {matches.map((match, index) => (
+              <li key={`${match.page}-${match.start}-${index}`}>
+                <button onClick={() => goToMatch(index)} className={`w-full rounded-xl border p-3 text-left transition-colors ${active === index ? 'border-blue-300 bg-blue-50 ring-1 ring-blue-100' : 'border-slate-200 bg-white hover:border-blue-200'}`}>
+                  <span className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-bold text-blue-700">Match {index + 1}</span>
+                    <span className="text-[11px] text-slate-500">Page {match.page}</span>
+                  </span>
+                  <span className="mt-1 block break-words text-sm text-slate-800">{match.text || 'Matching text'}</span>
+                </button>
+              </li>
+            ))}
+          </ol>
+        ) : <div className="rounded-xl bg-amber-50 p-4 text-sm text-amber-800">No matches found. Try another spelling or search term.</div>}
+      </div>
+    </div>
+  )
+
+  return (
+    <div className="mx-auto max-w-[1600px]">
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <Link to="/" className="rounded-xl border border-slate-200 bg-white p-2.5 text-slate-600 hover:bg-slate-50" aria-label="Back to home"><ArrowLeft size={18} /></Link>
+          <div>
+            <span className="text-xs font-bold uppercase tracking-wider text-blue-600">E-Docs · Smart PDF</span>
+            <h1 className="font-display text-2xl font-bold text-slate-900 sm:text-3xl">PDF Viewer & Smart Search</h1>
+          </div>
+        </div>
+        <label className="btn-primary inline-flex cursor-pointer items-center gap-2 rounded-xl px-4 py-3 text-sm">
+          <FileUp size={17} /> {doc ? 'Change PDF' : 'Upload PDF'}
+          <input type="file" accept="application/pdf,.pdf" className="sr-only" onChange={onFileInput} />
+        </label>
+      </div>
+
+      {!doc && (
+        <label onDragOver={event => event.preventDefault()} onDrop={event => { event.preventDefault(); void openFile(event.dataTransfer.files[0]) }} className="flex min-h-[360px] cursor-pointer flex-col items-center justify-center rounded-3xl border-2 border-dashed border-blue-200 bg-white px-6 py-12 text-center transition-colors hover:border-blue-400 hover:bg-blue-50/40">
+          <span className="grid h-16 w-16 place-items-center rounded-2xl bg-blue-50 text-blue-600"><FileSearch size={30} /></span>
+          <span className="mt-5 text-xl font-bold text-slate-900">Drop your PDF here</span>
+          <span className="mt-2 max-w-md text-sm text-slate-500">Open and search large documents directly in your browser. Your PDF stays on your device.</span>
+          <span className="btn-primary mt-6 rounded-xl px-6 py-3 text-sm">Browse PDF</span>
+          <input type="file" accept="application/pdf,.pdf" className="sr-only" onChange={onFileInput} />
+        </label>
+      )}
+
+      {loading && <div className="mt-4 flex items-center gap-3 rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-800"><LoaderCircle className="animate-spin" size={18} />{progress}</div>}
+      {error && <div role="alert" className="mt-4 flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"><AlertCircle size={18} />{error}</div>}
+
+      {doc && (
+        <div className="grid min-h-[75vh] gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
+          <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
+            <div className="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-white/95 px-3 py-3 backdrop-blur sm:px-4">
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="max-w-[180px] truncate text-sm font-semibold text-slate-700 sm:max-w-xs">{fileName}</span>
+                <span className="shrink-0 rounded-md bg-slate-100 px-2 py-1 text-[11px] text-slate-500">{doc.numPages} pages</span>
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <div className="flex rounded-lg border border-slate-200 p-0.5">
+                  {(['1x1', '1x2', '2x2'] as const).map((value) => (
+                    <button key={value} onClick={() => setLayout(value)} className={`rounded-md px-2 py-1.5 text-xs font-semibold ${layout === value ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-100'}`} aria-pressed={layout === value}>{value}</button>
+                  ))}
+                </div>
+                <button onClick={() => setZoom(v => Math.max(.5, +(v - .1).toFixed(1)))} className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-50" aria-label="Zoom out"><Minus size={15} /></button>
+                <span className="w-10 text-center text-xs tabular-nums text-slate-600">{Math.round(zoom * 100)}%</span>
+                <button onClick={() => setZoom(v => Math.min(1.8, +(v + .1).toFixed(1)))} className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-50" aria-label="Zoom in"><Plus size={15} /></button>
+                <button onClick={() => setShowResults(v => !v)} className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-50 lg:hidden" aria-label="Toggle search results"><Search size={16} /></button>
+              </div>
+            </div>
+            <div className={`grid items-start gap-3 overflow-auto p-3 sm:p-5 ${layout === '1x1' ? 'grid-cols-1' : layout === '1x2' ? 'grid-cols-1 xl:grid-cols-2' : 'grid-cols-1 sm:grid-cols-2'}`}>
+              {visiblePages.map(pageNo => (
+                <div id={`pdf-page-${pageNo}`} key={pageNo} className="min-w-0" onClick={() => setCurrentPage(pageNo)}>
+                  <PdfPage doc={doc} pageNumber={pageNo} query={query} matches={matches.filter(m => m.page === pageNo)} zoom={zoom} />
+                </div>
+              ))}
+            </div>
+            <div className="flex items-center justify-center gap-3 border-t border-slate-200 bg-white p-3">
+              <button onClick={() => setCurrentPage(p => Math.max(1, p - (layout === '1x1' ? 1 : layout === '1x2' ? 2 : 4)))} disabled={currentPage === 1} className="rounded-lg border border-slate-200 p-2 text-slate-600 disabled:opacity-30" aria-label="Previous pages"><ChevronLeft size={18} /></button>
+              <span className="text-xs font-medium tabular-nums text-slate-600">Page {currentPage} of {doc.numPages}</span>
+              <button onClick={() => setCurrentPage(p => Math.min(doc.numPages, p + (layout === '1x1' ? 1 : layout === '1x2' ? 2 : 4)))} disabled={currentPage >= doc.numPages} className="rounded-lg border border-slate-200 p-2 text-slate-600 disabled:opacity-30" aria-label="Next pages"><ChevronRight size={18} /></button>
+            </div>
+          </section>
+
+          <aside className={`min-h-[320px] overflow-hidden rounded-2xl border border-slate-200 bg-white lg:sticky lg:top-20 lg:h-[calc(100vh-6rem)] ${showResults ? 'block' : 'hidden lg:block'}`}>
+            {resultPanel}
+          </aside>
+          {!showResults && <button onClick={() => { setShowResults(true); inputRef.current?.focus() }} className="fixed bottom-4 right-4 z-30 flex items-center gap-2 rounded-full bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-xl lg:hidden"><Search size={17} /> Find in PDF</button>}
+        </div>
+      )}
+      {doc && <div className="mt-3 text-center text-xs text-slate-500">Private by design · PDF processing and text search run in your browser</div>}
+    </div>
+  )
+}

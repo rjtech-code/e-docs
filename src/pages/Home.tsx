@@ -115,6 +115,14 @@ export default function Home() {
                 Explore Tools
               </a>
             </div>
+            <Link to="/pdf-smart-search" className="mt-5 flex w-full max-w-md items-center gap-3 rounded-2xl border border-blue-200 bg-white p-3.5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-blue-400 hover:shadow-md">
+              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-blue-50 text-blue-600"><Search size={21} /></span>
+              <span className="min-w-0 flex-1">
+                <span className="block font-display text-sm font-bold text-foreground">New · PDF Viewer & Smart Search</span>
+                <span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">Upload a PDF, search every page and find names even when spaces or letter case differ.</span>
+              </span>
+              <ArrowRight size={18} className="shrink-0 text-blue-600" />
+            </Link>
             <button onClick={openSearch} className="mt-6 flex h-12 w-full max-w-md items-center gap-3 rounded-xl border border-border bg-white px-4 text-left text-sm text-muted-foreground shadow-sm transition-colors hover:border-primary/40">
               <Search size={17} /> <span className="flex-1">Search for a tool, e.g. “merge” or “word”</span>
             </button>

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { Home, LayoutGrid, History, Settings, Languages, LogOut, LogIn, ShieldCheck, Menu, Search, UserPlus } from 'lucide-react'
+import { Home, LayoutGrid, History, Settings, Languages, LogOut, LogIn, ShieldCheck, Menu, Search, UserPlus, FileSearch } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { tools } from '../data/tools'
 import { pushRecentTool } from '../lib/recentTools'
@@ -14,6 +14,7 @@ function useNav() {
   return [
     { to: '/home', label: 'Home', icon: Home, end: true },
     { to: '/all-tools', label: 'All Tools', icon: LayoutGrid, end: false },
+    { to: '/pdf-smart-search', label: 'Smart PDF Search', icon: FileSearch, end: false },
     { to: '/history', label: 'Recent Files & History', icon: History, end: false },
     { to: '/settings', label: 'Settings', icon: Settings, end: false },
   ]
