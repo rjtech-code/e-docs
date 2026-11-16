@@ -3,7 +3,7 @@ import type { ChangeEvent, CSSProperties } from 'react'
 import { Link } from 'react-router-dom'
 import {
   ArrowLeft, ChevronLeft, ChevronRight, FileSearch, FileUp, Minus, Plus,
-  Search, X, LayoutGrid, Monitor, Smartphone, LoaderCircle, AlertCircle,
+  Search, X, LoaderCircle, AlertCircle,
 } from 'lucide-react'
 import * as pdfjs from 'pdfjs-dist'
 import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist'
@@ -97,7 +97,6 @@ export default function PdfSmartSearch() {
   const [error, setError] = useState('')
   const [showResults, setShowResults] = useState(true)
   const [currentPage, setCurrentPage] = useState(1)
-  const [mobileSearchOpen, setMobileSearchOpen] = useState(true)
 
   const openFile = async (file?: File) => {
     if (!file) return
