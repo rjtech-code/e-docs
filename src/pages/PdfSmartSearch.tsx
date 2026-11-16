@@ -11,7 +11,7 @@ import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist'
 pdfjs.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString()
 
 type Match = { docId: string; docName: string; page: number; start: number; end: number; text: string }
-type PageText = { text: string; items: Array<{ str: string; start: number; end: number }> }
+type PageText = { text: string; items: Array<{ str: string; start: number; end: number; transform: number[]; width: number; height: number }> }
 type LoadedPdf = { id: string; name: string; doc: PDFDocumentProxy; pages: PageText[]; currentPage: number }
 
 const normalise = (value: string) => value.toLocaleLowerCase().replace(/[\s\u00a0]+/g, '')
@@ -36,6 +36,7 @@ function PdfPage({ doc, pageNumber, pageText, highlights, zoom }: {
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [error, setError] = useState('')
+  const [renderSize, setRenderSize] = useState({ width: 0, height: 0, scale: 1 })
 
   useEffect(() => {
     let cancelled = false
@@ -58,6 +59,7 @@ function PdfPage({ doc, pageNumber, pageText, highlights, zoom }: {
         canvas.height = Math.floor(viewport.height * ratio)
         canvas.style.width = `${viewport.width}px`
         canvas.style.height = `${viewport.height}px`
+        setRenderSize({ width: viewport.width, height: viewport.height, scale })
         renderTask = page.render({ canvasContext: context, viewport, transform: ratio !== 1 ? [ratio, 0, 0, ratio, 0, 0] : undefined, canvas })
         await (renderTask as any).promise
       } catch (e) {
@@ -74,11 +76,17 @@ function PdfPage({ doc, pageNumber, pageText, highlights, zoom }: {
     const itemEnd = offset + item.str.length
     offset = itemEnd + 1
     const relevant = highlights.filter(h => h.start < itemEnd && h.end > itemStart)
-    if (!relevant.length || !item.str.length) return []
+    if (!relevant.length || !item.str.length || !item.transform?.length) return []
     const active = relevant.some(h => h.active)
-    const leftChar = Math.max(0, Math.min(...relevant.map(h => Math.max(0, h.start - itemStart))))
-    const rightChar = Math.min(item.str.length, Math.max(...relevant.map(h => Math.min(item.str.length, h.end - itemStart))))
-    return [{ item, leftChar, rightChar, active }]
+    const from = Math.max(0, Math.min(...relevant.map(h => Math.max(0, h.start - itemStart))))
+    const to = Math.min(item.str.length, Math.max(...relevant.map(h => Math.min(item.str.length, h.end - itemStart))))
+    const scale = renderSize.scale
+    const fontHeight = Math.max(item.height || 0, Math.hypot(item.transform[2] || 0, item.transform[3] || 0), 5)
+    const left = item.transform[4] * scale + (item.width * scale * from / item.str.length)
+    const top = renderSize.height - item.transform[5] * scale - fontHeight * scale
+    const width = Math.max(3, item.width * scale * (to - from) / item.str.length)
+    const height = Math.max(5, fontHeight * scale)
+    return [{ left, top, width, height, active }]
   })
 
   return (
@@ -88,22 +96,7 @@ function PdfPage({ doc, pageNumber, pageText, highlights, zoom }: {
       <span className="absolute bottom-2 right-2 rounded bg-slate-900/75 px-2 py-1 text-[10px] text-white">Page {pageNumber}</span>
       {boxes.length > 0 && (
         <div className="pointer-events-none absolute inset-0" aria-hidden="true">
-          {(() => {
-            let textOffset = 0
-            return pageText.items.map((item, index) => {
-              const itemStart = textOffset
-              textOffset += item.str.length + 1
-              const box = boxes.find(b => b.item === item)
-              if (!box) return null
-              // PDF text coordinates are in points; scale them to the rendered page.
-              // The overlay is sized to the canvas by its rendered CSS dimensions.
-              const scaleX = (canvasRef.current?.clientWidth || 1) / Math.max(1, canvasRef.current?.width || 1) * (window.devicePixelRatio || 1)
-              const scaleY = (canvasRef.current?.clientHeight || 1) / Math.max(1, canvasRef.current?.height || 1) * (window.devicePixelRatio || 1)
-              const left = itemStart
-              void left
-              return <span key={index} data-text-start={itemStart} className={box.active ? "absolute inset-x-0 rounded bg-orange-400/35 ring-2 ring-orange-500" : "absolute inset-x-0 rounded bg-yellow-300/30 ring-1 ring-yellow-400/70"} style={{ top: 0, height: 0, left: 0, width: 0, transform: `scale(${scaleX}, ${scaleY})` }} />
-            })
-          })()}
+          {boxes.map((box, index) => <span key={index} className={box.active ? "absolute rounded-sm bg-orange-400/45 ring-2 ring-orange-500 shadow-[0_0_0_3px_rgba(249,115,22,0.18)]" : "absolute rounded-sm bg-yellow-300/45 ring-1 ring-yellow-500/80"} style={{ left: box.left, top: box.top, width: box.width, height: box.height }} />)}
         </div>
       )}
     </div>
@@ -140,7 +133,7 @@ export default function PdfSmartSearch() {
           setProgress(`Reading ${file.name} · page ${pageNo} of ${loaded.numPages}`)
           const page = await loaded.getPage(pageNo)
           const content = await page.getTextContent()
-          const items = content.items.filter((item: any) => typeof item.str === 'string').map((item: any) => ({ str: item.str, start: 0, end: 0 }))
+          const items = content.items.filter((item: any) => typeof item.str === 'string').map((item: any) => ({ str: item.str, start: 0, end: 0, transform: item.transform as number[], width: item.width as number, height: item.height as number }))
           let text = ''
           items.forEach(item => { item.start = text.length; text += item.str + ' '; item.end = text.length })
           extracted.push({ text, items })
