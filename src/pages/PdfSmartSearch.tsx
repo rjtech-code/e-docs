@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { ChangeEvent, CSSProperties } from 'react'
+import type { ChangeEvent } from 'react'
 import { Link } from 'react-router-dom'
 import {
   ArrowLeft, ChevronLeft, ChevronRight, FileSearch, FileUp, Minus, Plus,
